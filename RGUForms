@@ -1,0 +1,437 @@
+import React, { useMemo, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ChevronRight, Building2, ClipboardList, Users, FileText, Search, Plus, Download, CheckCircle2, Workflow, ClipboardCheck, Wrench, Settings2, Fuel, HardHat, Construction, Truck, Shield, Warehouse, ClipboardSignature, PenSquare } from "lucide-react";
+
+// ---------------------------------------------
+// RGU MARKETING — ORGANIZATIONAL CHART (Interactive)
+// Single-file React component. Tailwind + shadcn/ui.
+// Click any role card to view: Obligations, Tasks/Functions, and Clickable Forms/Templates.
+// All templates open as plain-text (Notepad-friendly) for easy copy-paste.
+// ---------------------------------------------
+
+// Utility: Simple, copyable plain-text modal for forms/templates
+const TemplateModal = ({ open, onOpenChange, title, body }: { open: boolean; onOpenChange: (v: boolean) => void; title: string; body: string; }) => {
+  const [copied, setCopied] = useState(false);
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-semibold">{title}</DialogTitle>
+          <DialogDescription className="text-muted-foreground">Copy, edit, or save. Format kept simple for Notepad.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <Textarea
+            className="min-h-[360px] font-mono text-sm"
+            defaultValue={body}
+          />
+          <div className="flex items-center gap-2 justify-end">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                navigator.clipboard.writeText(body);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+            >
+              {copied ? <CheckCircle2 className="mr-2 h-4 w-4"/> : <ClipboardCheck className="mr-2 h-4 w-4"/>}
+              {copied ? "Copied" : "Copy to clipboard"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// Plain-text templates (minimalistic, ISO/DPWH-friendly headings)
+const templates = {
+  jobOrder: (data?: any) => `RGU MARKETING — JOB ORDER\nDate: __________\nProject: __________ (Contract ID if DPWH: __________)\nLocation: __________\nRequested By: __________\nApproved By: __________\n\nWORK DETAILS:\n- Task Title: __________\n- Scope/Instructions: __________________________________________\n- Start: __________  End: __________  Duration: __________\n- Crew/Personnel: __________________________________________\n\nRESOURCES:\n- Materials: __________________________________________\n- Equipment: __________________________________________\n- Fuel/Lubes: __________________________________________\n\nATTACHMENTS REQUIRED:\n[ ] Site Sketch   [ ] BOQ Ref   [ ] Safety JHA   [ ] Permits\n\nVERIFICATION & SIGN-OFF:\nPrepared: __________   Verified: __________   Approved: __________\n` ,
+  materialRequest: () => `RGU MARKETING — MATERIAL REQUEST (MR)\nDate: __________\nProject: __________\nRequested By: __________ (Role: __________)\nNeeded On: __________ (ETA to Site: __________)\n\nITEMS:\n1) __________ | Qty: ___ | Unit: ___ | Specs/Brand: ___ | BOQ Ref: ___\n2) __________ | Qty: ___ | Unit: ___ | Specs/Brand: ___ | BOQ Ref: ___\n\nDELIVERY / PICKUP:\n- Supplier: __________  PR/PO No.: __________\n- Warehouse Check: [ ] Available [ ] Not Available\n\nApprovals: Requester → PE → PM/AMO\n` ,
+  equipmentRequest: () => `RGU MARKETING — EQUIPMENT REQUEST (ER)\nDate: __________\nProject: __________\nRequested By: __________\n\nEQUIPMENT NEEDED:\n- Type: __________  Qty: ___  Operator: [ ] Yes [ ] No\n- Start: __________  End: __________  Shift Hours: __________\n- Hauling Required: [ ] Yes [ ] No  Location: __________\n\nFuel Plan: __________  Charge To: __________\nApprovals: Foreman → PE → Dispatcher/PM\n` ,
+  fuelSlip: () => `RGU MARKETING — FUEL SLIP\nDate: __________\nProject/Plate: __________\nEquipment/Vehicle: __________  Operator/Driver: __________\nLiters: ___  Purpose: __________  Issued By: __________\nReceiver Signature: __________  Verifier: __________\n` ,
+  timesheet: () => `RGU MARKETING — DAILY TIMESHEET\nDate: __________  Project: __________\nName | Role | Time In | Time Out | Hours | Verified By\n-----|------|---------|----------|-------|-----------\n\nNotes/Weather: __________________________________________\n` ,
+  dar: () => `RGU MARKETING — DAILY ACCOMPLISHMENT REPORT (DAR)\nDate: __________  Project: __________\nActivities:\n- __________ (Qty/Units: ___)\n- __________ (Qty/Units: ___)\nMaterials Used: __________\nEquipment Used: __________ (Hours: ___)\nIssues/Delays: __________  Corrective Action: __________\nVerified By: __________  Approved: __________\n` ,
+  siteInstruction: () => `RGU MARKETING — SITE INSTRUCTION (SI)\nDate: __________  Project: __________\nInstruction To: __________  From: __________\nInstruction Details: __________________________________________\nEffective On: __________  Safety Checks Done: [ ] Yes\nAcknowledged By: __________  Verifier: __________\n` ,
+  ncr: () => `RGU MARKETING — NONCONFORMANCE REPORT (NCR)\nDate: __________  Project: __________\nRef: __________  Detected By: __________\nDescription of NC: __________________________________________\nImmediate Containment: __________\nRoot Cause (5-Why): __________\nCorrective Action: __________  Target Date: __________\nVerified Closed By: __________\n` ,
+  incident: () => `RGU MARKETING — INCIDENT/NEAR-MISS REPORT\nDate/Time: __________  Project: __________\nPersons Involved: __________  Injury: [ ] Yes [ ] No\nDescription: __________________________________________\nImmediate Action: __________  Preventive Action: __________\nReported To DOLE/Authorities: [ ] N/A [ ] Yes (Ref No: ___)\n` ,
+  purchaseOrder: () => `RGU MARKETING — PURCHASE ORDER (PO)\nDate: __________  PO No.: __________\nSupplier: __________  Address: __________\nDeliver To: __________ (Project/Warehouse)\n\nITEM | QTY | UNIT | UNIT PRICE | AMOUNT\n---- | --- | ---- | ---------- | ------\n\nTerms: __________  Delivery Date: __________\nApproved By: __________  Received By: __________\n` ,
+  pettyCash: () => `RGU MARKETING — PETTY CASH VOUCHER (PCV)\nDate: __________  PCV No.: __________\nPayee: __________  Purpose: __________\nAmount: PHP __________ (₱______)\nCharged To: Project __________ / Dept __________\nRequested By: __________  Approved By: __________  Liquidation Due: __________\n` ,
+  gatePass: () => `RGU MARKETING — GATE PASS (IN/OUT)\nDate: __________  Type: [ ] IN [ ] OUT\nItem/Equipment: __________  Qty: ___  Serial/Plate: __________\nFrom: __________  To: __________\nReason: __________  Approved By: __________  Checker: __________\n` ,
+  deliveryReceipt: () => `RGU MARKETING — DELIVERY RECEIPT (DR)\nDate: __________  DR No.: __________\nDelivered To: __________ (Project/Warehouse)\nSupplier/From: __________  Vehicle/Plate: __________\n\nITEM | QTY | UNIT | REMARKS\n---- | --- | ---- | -------\n\nReceived By: __________  Time: __________  Condition: __________\n` ,
+};
+
+// Organization roles and mapping to frequently used templates
+const ROLE_CATALOG = [
+  {
+    id: "amo",
+    title: "Authorized Managing Officer",
+    dept: "Executive",
+    icon: Building2,
+    summary: "Leads company direction, approvals, and compliance.",
+    obligations: [
+      "Approve contracts, POs, high-value disbursements",
+      "Ensure ISO 9001:2015 & DPWH standards are embedded",
+      "Sign off on key HR appointments and discipline",
+      "Risk management and stakeholder coordination"
+    ],
+    functions: [
+      "Weekly review: project KPIs, cashflow, procurement",
+      "Escalation point for NCRs and incidents",
+      "Approve org policies and audit schedules"
+    ],
+    forms: ["purchaseOrder", "pettyCash", "ncr", "incident"],
+  },
+  {
+    id: "pm",
+    title: "Project Manager",
+    dept: "Projects",
+    icon: Workflow,
+    summary: "Owns project delivery, budget, and schedule.",
+    obligations: [
+      "Hit timeline, quality, and cost targets",
+      "Approve Job Orders and Site Instructions",
+      "Coordinate with DPWH and LGUs; manage change orders",
+    ],
+    functions: [
+      "Create lookahead schedules and manpower plans",
+      "Chair daily huddles; review DAR and timesheets",
+      "Verify BOQ alignment and progress billing",
+    ],
+    forms: ["jobOrder", "siteInstruction", "dar", "timesheet"],
+  },
+  {
+    id: "pe",
+    title: "Project Engineer",
+    dept: "Engineering",
+    icon: Settings2,
+    summary: "Translates plans to executable tasks with QA/QC.",
+    obligations: [
+      "Prepare Job Orders, method statements, ITP",
+      "QA/QC checks; quantity take-off; DPR/DAR review",
+      "Coordinate materials, equipment, and permits"
+    ],
+    functions: [
+      "Update drawings/as-builts; prepare SI and RFI",
+      "Daily verify quantities vs BOQ",
+      "Support billing documentation"
+    ],
+    forms: ["jobOrder", "materialRequest", "equipmentRequest", "siteInstruction", "dar"],
+  },
+  {
+    id: "foreman",
+    title: "Foreman",
+    dept: "Operations",
+    icon: HardHat,
+    summary: "Leads crew execution and site records.",
+    obligations: [
+      "Execute Job Orders and enforce safety",
+      "Keep daily logbook, DAR, and timesheets",
+      "Account for materials/tools issuance and return"
+    ],
+    functions: [
+      "Brief crew; assign tasks; confirm outputs",
+      "Request materials/equipment and fuel slips",
+      "Coordinate with PE on inspections"
+    ],
+    forms: ["dar", "timesheet", "fuelSlip", "materialRequest", "equipmentRequest", "gatePass"],
+  },
+  {
+    id: "safety",
+    title: "Safety Officer",
+    dept: "HSE",
+    icon: Shield,
+    summary: "Ensures compliance with DOLE/DPR safety rules.",
+    obligations: [
+      "Toolbox talks; JHA; incident/NCR handling",
+      "PPE enforcement; equipment safety checks",
+      "Daily safety walk and permits"
+    ],
+    functions: [
+      "Maintain safety records; coordinate trainings",
+      "Lead accident investigation and CAPA",
+      "Report to PM/AMO weekly"
+    ],
+    forms: ["incident", "ncr", "siteInstruction"],
+  },
+  {
+    id: "dispatcher",
+    title: "Equipment Dispatcher",
+    dept: "Plant & Fleet",
+    icon: Truck,
+    summary: "Assigns equipment, operators, and fuel.",
+    obligations: [
+      "Schedule equipment; track hours & maintenance",
+      "Issue fuel slips; verify trip tickets",
+      "Coordinate with warehouse and site"
+    ],
+    functions: [
+      "Maintain equipment log and PMS calendar",
+      "Dispatch records for billing/charge-outs",
+      "Operator certifications tracking"
+    ],
+    forms: ["equipmentRequest", "fuelSlip", "gatePass", "deliveryReceipt"],
+  },
+  {
+    id: "warehouse",
+    title: "Warehouse/Storekeeper",
+    dept: "Warehouse",
+    icon: Warehouse,
+    summary: "Controls materials and tool issuance.",
+    obligations: [
+      "Receive, inspect, and record deliveries",
+      "Issue materials/tools vs MR/JO; prevent loss",
+      "Cycle count and reorder alerts"
+    ],
+    functions: [
+      "Maintain DR/IR, stock cards, and bin locations",
+      "Return & repair process; gate pass control",
+      "Coordinate with Procurement"
+    ],
+    forms: ["materialRequest", "deliveryReceipt", "gatePass"],
+  },
+  {
+    id: "procurement",
+    title: "Procurement Officer",
+    dept: "Supply Chain",
+    icon: ClipboardSignature,
+    summary: "Sources and purchases per BOQ/specs.",
+    obligations: [
+      "Request for Quotation; PO issuance",
+      "Supplier vetting; 3-quote policy",
+      "Delivery follow-up and variance handling"
+    ],
+    functions: [
+      "Coordinate with PE/PM on needed dates",
+      "Maintain supplier master and price book",
+      "Ensure documents for DPWH auditing"
+    ],
+    forms: ["purchaseOrder", "deliveryReceipt", "materialRequest"],
+  },
+  {
+    id: "hr",
+    title: "HR/Admin",
+    dept: "Admin",
+    icon: Users,
+    summary: "Manpower, payroll, and compliance files.",
+    obligations: [
+      "Hiring, onboarding; contracts and memos",
+      "Timekeeping & payroll support",
+      "Record control as per ISO"
+    ],
+    functions: [
+      "Maintain 201 files; training matrix",
+      "Implement policies and appraisal cycles",
+      "Support site with forms and slips"
+    ],
+    forms: ["timesheet", "pettyCash"],
+  },
+  {
+    id: "bookkeeper",
+    title: "Accountant/Bookkeeper",
+    dept: "Finance",
+    icon: FileText,
+    summary: "Handles disbursements, SOAs, and audits.",
+    obligations: [
+      "Validate PCV, DR, PO; maintain ledgers",
+      "Prepare billing; taxes and statutory filings",
+      "Cash flow and cost control with PM"
+    ],
+    functions: [
+      "Reconcile suppliers and payroll",
+      "Maintain project cost codes (Zoho Books)",
+      "Support DPWH billing compliance"
+    ],
+    forms: ["pettyCash", "purchaseOrder", "deliveryReceipt"],
+  },
+  {
+    id: "docctrl",
+    title: "Document Controller",
+    dept: "QA/QC",
+    icon: ClipboardList,
+    summary: "Controls document versions and filing.",
+    obligations: [
+      "Register and archive JOs, SI, NCR, DAR",
+      "Issue controlled templates and logs",
+      "Maintain ISO Master List"
+    ],
+    functions: [
+      "Numbering system; retrieval on audits",
+      "Distribute latest revisions to site",
+      "Weekly document health check"
+    ],
+    forms: ["siteInstruction", "ncr", "dar", "deliveryReceipt"],
+  },
+];
+
+// Helper: map template key to label/icon
+const TEMPLATE_META: Record<string, { label: string; }> = {
+  jobOrder: { label: "Job Order" },
+  materialRequest: { label: "Material Request" },
+  equipmentRequest: { label: "Equipment Request" },
+  fuelSlip: { label: "Fuel Slip" },
+  timesheet: { label: "Daily Timesheet" },
+  dar: { label: "Daily Accomplishment Report" },
+  siteInstruction: { label: "Site Instruction" },
+  ncr: { label: "Nonconformance Report" },
+  incident: { label: "Incident Report" },
+  purchaseOrder: { label: "Purchase Order" },
+  pettyCash: { label: "Petty Cash Voucher" },
+  gatePass: { label: "Gate Pass" },
+  deliveryReceipt: { label: "Delivery Receipt" },
+};
+
+const RoleCard = ({ role, onOpen }: any) => {
+  const Icon = role.icon || Users;
+  return (
+    <Card
+      className="group hover:shadow-lg transition-shadow cursor-pointer"
+      onClick={() => onOpen(role)}
+    >
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Icon className="h-5 w-5" />
+            <CardTitle className="text-base">{role.title}</CardTitle>
+          </div>
+          <Badge variant="secondary">{role.dept}</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="text-sm text-muted-foreground flex items-center justify-between">
+        <span>{role.summary}</span>
+        <ChevronRight className="h-4 w-4 opacity-50 group-hover:opacity-100" />
+      </CardContent>
+    </Card>
+  );
+};
+
+export default function App() {
+  const [query, setQuery] = useState("");
+  const [activeRole, setActiveRole] = useState<any | null>(null);
+  const [tmplOpen, setTmplOpen] = useState<{ key: string | null; open: boolean }>({ key: null, open: false });
+
+  const roles = useMemo(() => {
+    if (!query) return ROLE_CATALOG;
+    const q = query.toLowerCase();
+    return ROLE_CATALOG.filter((r) =>
+      [r.title, r.dept, r.summary, ...(r.obligations||[]), ...(r.functions||[])].join(" ").toLowerCase().includes(q)
+    );
+  }, [query]);
+
+  const openTemplate = (key: string) => setTmplOpen({ key, open: true });
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-white to-slate-50">
+      <div className="max-w-7xl mx-auto px-4 py-6 sm:py-10">
+        <header className="flex items-start sm:items-center justify-between gap-4 flex-col sm:flex-row">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">RGU Organizational Chart</h1>
+            <p className="text-sm text-muted-foreground mt-1">Click a role to view obligations, functions, and launch job-related templates.</p>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Input
+              placeholder="Search roles, departments, duties..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full sm:w-80"
+            />
+            <Button variant="secondary" className="hidden sm:flex"><Search className="h-4 w-4 mr-2"/>Search</Button>
+          </div>
+        </header>
+
+        <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {roles.map((role) => (
+            <RoleCard key={role.id} role={role} onOpen={setActiveRole} />
+          ))}
+          {roles.length === 0 && (
+            <Card>
+              <CardContent className="py-10 text-center text-muted-foreground">No matches. Try another keyword.</CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Quick Launch */}
+        <div className="mt-8">
+          <Card className="border-dashed">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2"><PenSquare className="h-5 w-5"/> Quick Launch Templates</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-2">
+              {Object.entries(TEMPLATE_META).map(([key, meta]) => (
+                <Button key={key} variant="outline" onClick={() => openTemplate(key)}>{meta.label}</Button>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Active Role Drawer/Modal */}
+        <Dialog open={!!activeRole} onOpenChange={(o) => !o && setActiveRole(null)}>
+          <DialogContent className="max-w-3xl">
+            {activeRole && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    {activeRole.icon ? React.createElement(activeRole.icon, { className: "h-5 w-5" }) : null}
+                    {activeRole.title}
+                  </DialogTitle>
+                  <DialogDescription className="text-xs">Department: {activeRole.dept}</DialogDescription>
+                </DialogHeader>
+                <Tabs defaultValue="obligations" className="mt-2">
+                  <TabsList>
+                    <TabsTrigger value="obligations">Obligations</TabsTrigger>
+                    <TabsTrigger value="functions">Functions</TabsTrigger>
+                    <TabsTrigger value="forms">Forms & Templates</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="obligations" className="pt-3">
+                    <ul className="list-disc pl-5 space-y-2 text-sm">
+                      {activeRole.obligations?.map((o: string, i: number) => (
+                        <li key={i}>{o}</li>
+                      ))}
+                    </ul>
+                  </TabsContent>
+                  <TabsContent value="functions" className="pt-3">
+                    <ul className="list-disc pl-5 space-y-2 text-sm">
+                      {activeRole.functions?.map((f: string, i: number) => (
+                        <li key={i}>{f}</li>
+                      ))}
+                    </ul>
+                  </TabsContent>
+                  <TabsContent value="forms" className="pt-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {activeRole.forms?.map((k: string) => (
+                        <Button key={k} variant="outline" onClick={() => openTemplate(k)}>
+                          {TEMPLATE_META[k]?.label || k}
+                        </Button>
+                      ))}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Template modal (single instance, switches by key) */}
+        <TemplateModal
+          open={tmplOpen.open}
+          onOpenChange={(o) => setTmplOpen((s) => ({ ...s, open: o }))}
+          title={tmplOpen.key ? TEMPLATE_META[tmplOpen.key]?.label : "Template"}
+          body={tmplOpen.key ? (templates as any)[tmplOpen.key]() : ""}
+        />
+
+        {/* Footer notes for compliance */}
+        <div className="mt-10 text-xs text-muted-foreground space-y-2">
+          <Separator />
+          <p><strong>Notes:</strong> Keep forms simple and version-controlled. Align with ISO 9001:2015 (Document Control, Nonconformance, Corrective Action) and DPWH documentation norms. Replace blanks with your project-specific details.</p>
+          <p>Suggested filing: <code>RGU/Projects/[ContractID]/Forms/</code> with numbering (e.g., <code>25JD0026-JO-0001</code>).</p>
+        </div>
+      </div>
+    </div>
+  );
+}
