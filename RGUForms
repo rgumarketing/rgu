@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronRight, Building2, ClipboardList, Users, FileText, Search, Plus, Download, CheckCircle2, Workflow, ClipboardCheck, Wrench, Settings2, Fuel, HardHat, Construction, Truck, Shield, Warehouse, ClipboardSignature, PenSquare } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Label } from "@/components/ui/label";
+import { ChevronRight, Building2, ClipboardList, Users, FileText, Search, Plus, Download, CheckCircle2, Workflow, ClipboardCheck, Wrench, Settings2, Fuel, HardHat, Construction, Truck, Shield, Warehouse, ClipboardSignature, PenSquare, Loader2, MapPin, AlertCircle } from "lucide-react";
 
 // ---------------------------------------------
 // RGU MARKETING — ORGANIZATIONAL CHART (Interactive)
@@ -65,6 +67,337 @@ const templates = {
   pettyCash: () => `RGU MARKETING — PETTY CASH VOUCHER (PCV)\nDate: __________  PCV No.: __________\nPayee: __________  Purpose: __________\nAmount: PHP __________ (₱______)\nCharged To: Project __________ / Dept __________\nRequested By: __________  Approved By: __________  Liquidation Due: __________\n` ,
   gatePass: () => `RGU MARKETING — GATE PASS (IN/OUT)\nDate: __________  Type: [ ] IN [ ] OUT\nItem/Equipment: __________  Qty: ___  Serial/Plate: __________\nFrom: __________  To: __________\nReason: __________  Approved By: __________  Checker: __________\n` ,
   deliveryReceipt: () => `RGU MARKETING — DELIVERY RECEIPT (DR)\nDate: __________  DR No.: __________\nDelivered To: __________ (Project/Warehouse)\nSupplier/From: __________  Vehicle/Plate: __________\n\nITEM | QTY | UNIT | REMARKS\n---- | --- | ---- | -------\n\nReceived By: __________  Time: __________  Condition: __________\n` ,
+};
+
+const CIVIL_WORKS_API_URL = "https://dpwhapps.azurewebsites.net/api/Procurement/InvitationToBid";
+const LOCAL_STORAGE_KNOWN_IDS_KEY = "rgu-civil-works-known-project-ids";
+const LOCAL_STORAGE_OFFICE_KEY = "rgu-civil-works-office";
+const LOCAL_STORAGE_API_KEY = "rgu-civil-works-api-endpoint";
+const DEFAULT_OFFICE = "Zamboanga del Norte 3rd District Engineering Office";
+
+type CivilWorksItbRecord = {
+  projectId: string;
+  title: string;
+  office: string;
+  category?: string;
+  closingDate?: string;
+  closingDateObj?: Date | null;
+  postedDate?: string;
+  location?: string;
+  fileUrl?: string;
+  lat?: number;
+  lng?: number;
+  raw?: any;
+};
+
+const readLocalStorage = (key: string, fallback = "") => {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const value = window.localStorage.getItem(key);
+    return value ?? fallback;
+  } catch (error) {
+    console.warn("Unable to read localStorage", error);
+    return fallback;
+  }
+};
+
+const writeLocalStorage = (key: string, value: string) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, value);
+  } catch (error) {
+    console.warn("Unable to write localStorage", error);
+  }
+};
+
+const pickString = (source: any, keys: string[]): string | undefined => {
+  if (!source || typeof source !== "object") return undefined;
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+    if (value && typeof value === "object") {
+      if (typeof value.url === "string" && value.url.trim()) return value.url.trim();
+      if (typeof value.href === "string" && value.href.trim()) return value.href.trim();
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          const nested = pickString(item, ["url", "href", "link", "value"]);
+          if (nested) return nested;
+        }
+      }
+    }
+  }
+  return undefined;
+};
+
+const pickNumber = (source: any, keys: string[]): number | undefined => {
+  if (!source || typeof source !== "object") return undefined;
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "number" && !Number.isNaN(value)) return value;
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value.replace(/[^0-9.+-]/g, ""));
+      if (!Number.isNaN(parsed)) return parsed;
+    }
+  }
+  return undefined;
+};
+
+const parseFlexibleDate = (input: any): Date | null => {
+  if (!input) return null;
+  if (input instanceof Date) return Number.isNaN(input.valueOf()) ? null : input;
+  if (typeof input === "number") {
+    const numericDate = new Date(input);
+    return Number.isNaN(numericDate.valueOf()) ? null : numericDate;
+  }
+  if (typeof input !== "string") return null;
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  const numeric = Number(trimmed);
+  if (!Number.isNaN(numeric) && trimmed.length >= 5) {
+    const numericDate = new Date(numeric);
+    if (!Number.isNaN(numericDate.valueOf())) return numericDate;
+  }
+  let parsed = new Date(trimmed);
+  if (!Number.isNaN(parsed.valueOf())) return parsed;
+  const isoMatch = trimmed.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})(.*)$/);
+  if (isoMatch) {
+    const [, partA, partB, partYear, rest] = isoMatch;
+    let month = parseInt(partA, 10);
+    let day = parseInt(partB, 10);
+    if (month > 12 && day <= 12) {
+      [month, day] = [day, month];
+    }
+    const year = partYear.length === 2 ? Number(`20${partYear}`) : Number(partYear);
+    const suffix = rest?.trim() ? ` ${rest.trim()}` : "";
+    parsed = new Date(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}${suffix}`);
+    if (!Number.isNaN(parsed.valueOf())) return parsed;
+  }
+  return null;
+};
+
+const ensureAbsoluteUrl = (input?: string): string | undefined => {
+  if (!input) return undefined;
+  const trimmed = input.trim();
+  if (!trimmed) return undefined;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  return trimmed;
+};
+
+const toRecordArray = (payload: any): any[] => {
+  if (!payload) return [];
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.value)) return payload.value;
+  if (Array.isArray(payload?.results)) return payload.results;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.Records)) return payload.Records;
+  return [];
+};
+
+const normalizeItbRecords = (payload: any): CivilWorksItbRecord[] => {
+  const rawRecords = toRecordArray(payload);
+  return rawRecords.map((item: any) => {
+    const projectId =
+      pickString(item, [
+        "projectId",
+        "ProjectID",
+        "project_id",
+        "projectID",
+        "project_no",
+        "ProjectNo",
+        "projectNo",
+        "projectNumber",
+        "ProjectNumber",
+        "contractId",
+        "ContractId",
+        "ContractID",
+        "contract_no",
+        "ContractNo",
+        "contractNumber",
+        "referenceNo",
+        "ReferenceNo",
+        "projectCode",
+        "ProjectCode",
+        "project_code",
+        "PhilGEPSRefNo",
+      ]) || "";
+    const closingDateRaw =
+      pickString(item, [
+        "closingDate",
+        "ClosingDate",
+        "closing_date",
+        "bidClosingDate",
+        "BidClosingDate",
+        "submissionDeadline",
+        "SubmissionDeadline",
+        "deadline",
+        "Deadline",
+        "bidSubmissionDeadline",
+        "BidSubmissionDeadline",
+        "bidOpening",
+        "BidOpening",
+        "closingDateTime",
+        "ClosingDateTime",
+      ]) || undefined;
+    const closingDateObj = parseFlexibleDate(closingDateRaw);
+    const location =
+      pickString(item, [
+        "projectLocation",
+        "ProjectLocation",
+        "location",
+        "Location",
+        "Project_Location",
+        "Place",
+        "place",
+        "municipality",
+        "Municipality",
+        "province",
+        "Province",
+      ]) || undefined;
+    const category =
+      pickString(item, [
+        "category",
+        "Category",
+        "advertisementType",
+        "AdvertisementType",
+        "procurementType",
+        "ProcurementType",
+        "projectType",
+        "ProjectType",
+        "type",
+        "Type",
+      ]) || undefined;
+    const office =
+      pickString(item, [
+        "office",
+        "Office",
+        "implementingOffice",
+        "ImplementingOffice",
+        "procuringEntity",
+        "ProcuringEntity",
+        "procuringOffice",
+        "ProcuringOffice",
+        "districtEngineeringOffice",
+        "DistrictEngineeringOffice",
+        "implementing_unit",
+      ]) || "";
+    const title =
+      pickString(item, [
+        "title",
+        "Title",
+        "projectTitle",
+        "ProjectTitle",
+        "projectName",
+        "ProjectName",
+        "name",
+        "Name",
+        "contractName",
+        "ContractName",
+        "project",
+        "Project",
+      ]) || "Untitled Civil Works Project";
+    const fileUrl =
+      ensureAbsoluteUrl(
+        pickString(item, [
+          "file",
+          "File",
+          "fileUrl",
+          "FileUrl",
+          "documentUrl",
+          "DocumentUrl",
+          "attachment",
+          "Attachment",
+          "attachmentUrl",
+          "AttachmentUrl",
+          "link",
+          "Link",
+          "url",
+          "Url",
+          "downloadUrl",
+          "DownloadUrl",
+        ])
+      ) || undefined;
+    const postedDate =
+      pickString(item, [
+        "postingDate",
+        "PostingDate",
+        "publishedDate",
+        "PublishedDate",
+        "advertisementDate",
+        "AdvertisementDate",
+        "startDate",
+        "StartDate",
+        "publicationDate",
+        "PublicationDate",
+      ]) || undefined;
+    const lat = pickNumber(item, ["latitude", "Latitude", "lat", "Lat"]);
+    const lng = pickNumber(item, ["longitude", "Longitude", "lng", "Lng", "long", "Long"]);
+    const fallbackId = [projectId, title, closingDateRaw].filter(Boolean).join("::");
+
+    return {
+      projectId: fallbackId || `CW-${Math.random().toString(36).slice(2, 10).toUpperCase()}`,
+      title,
+      office,
+      category,
+      closingDate: closingDateRaw,
+      closingDateObj,
+      postedDate,
+      location,
+      fileUrl,
+      lat,
+      lng,
+      raw: item,
+    };
+  });
+};
+
+const computeMapUrl = (record: CivilWorksItbRecord): string | null => {
+  if (typeof record.lat === "number" && typeof record.lng === "number") {
+    return `https://www.google.com/maps/search/?api=1&query=${record.lat},${record.lng}`;
+  }
+  if (record.location) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(record.location)}`;
+  }
+  if (record.raw) {
+    const nestedLocation =
+      pickString(record.raw, ["city", "City", "municipality", "Municipality", "barangay", "Barangay"]) || undefined;
+    if (nestedLocation) {
+      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(nestedLocation)}`;
+    }
+  }
+  return null;
+};
+
+const formatDateDisplay = (date: Date | null | undefined, fallback?: string) => {
+  if (date && !Number.isNaN(date.valueOf())) {
+    try {
+      return date.toLocaleString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return date.toISOString();
+    }
+  }
+  return fallback || "—";
+};
+
+const buildCivilWorksRequestUrl = (base: string) => {
+  try {
+    const url = new URL(base);
+    if (!url.searchParams.has("advertisementType")) {
+      url.searchParams.set("advertisementType", "Civil Works");
+    }
+    return url.toString();
+  } catch {
+    return base;
+  }
 };
 
 // Organization roles and mapping to frequently used templates
@@ -312,9 +645,108 @@ const RoleCard = ({ role, onOpen }: any) => {
 };
 
 export default function App() {
+  const [itbApiUrl, setItbApiUrl] = useState<string>(() => readLocalStorage(LOCAL_STORAGE_API_KEY, CIVIL_WORKS_API_URL));
+  const [officeFilter, setOfficeFilter] = useState<string>(() => readLocalStorage(LOCAL_STORAGE_OFFICE_KEY, DEFAULT_OFFICE));
+  const [knownIdsInput, setKnownIdsInput] = useState<string>(() => readLocalStorage(LOCAL_STORAGE_KNOWN_IDS_KEY, ""));
+  const [rawItbRecords, setRawItbRecords] = useState<CivilWorksItbRecord[]>([]);
+  const [itbLoading, setItbLoading] = useState(false);
+  const [itbError, setItbError] = useState<string | null>(null);
+  const [lastFetchedAt, setLastFetchedAt] = useState<Date | null>(null);
+  const [sourceRecordCount, setSourceRecordCount] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [activeRole, setActiveRole] = useState<any | null>(null);
   const [tmplOpen, setTmplOpen] = useState<{ key: string | null; open: boolean }>({ key: null, open: false });
+
+  useEffect(() => {
+    writeLocalStorage(LOCAL_STORAGE_API_KEY, itbApiUrl);
+  }, [itbApiUrl]);
+
+  useEffect(() => {
+    writeLocalStorage(LOCAL_STORAGE_OFFICE_KEY, officeFilter);
+  }, [officeFilter]);
+
+  useEffect(() => {
+    writeLocalStorage(LOCAL_STORAGE_KNOWN_IDS_KEY, knownIdsInput);
+  }, [knownIdsInput]);
+
+  const knownProjectIds = useMemo(() => {
+    const tokens = knownIdsInput
+      .split(/[\n\r,;\t]+/)
+      .map((token) => token.trim().toUpperCase())
+      .filter(Boolean);
+    return Array.from(new Set(tokens));
+  }, [knownIdsInput]);
+
+  const knownProjectIdSet = useMemo(() => new Set(knownProjectIds), [knownProjectIds]);
+
+  const filteredItbRecords = useMemo(() => {
+    const now = new Date();
+    const officeNeedle = officeFilter.trim().toLowerCase();
+    return rawItbRecords.filter((record) => {
+      const categoryLabel = `${record.category || ""}`.toLowerCase();
+      const titleLabel = record.title.toLowerCase();
+      const isCivilWorks = categoryLabel.includes("civil work") || titleLabel.includes("civil work");
+      if (!isCivilWorks) return false;
+      const officeLabel = (record.office || "").toLowerCase();
+      if (officeNeedle && !officeLabel.includes(officeNeedle)) return false;
+      const closingDate = record.closingDateObj ?? parseFlexibleDate(record.closingDate);
+      if (closingDate && closingDate.getTime() < now.getTime()) return false;
+      const projectKey = (record.projectId || "").toUpperCase();
+      if (projectKey && knownProjectIdSet.has(projectKey)) return false;
+      return true;
+    });
+  }, [rawItbRecords, officeFilter, knownProjectIdSet]);
+
+  const fetchCivilWorksRecords = useCallback(async () => {
+    setItbLoading(true);
+    setItbError(null);
+    try {
+      const requestUrl = buildCivilWorksRequestUrl(itbApiUrl);
+      const response = await fetch(requestUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch Civil Works ITB (HTTP ${response.status})`);
+      }
+      const text = await response.text();
+      let payload: any;
+      try {
+        payload = JSON.parse(text);
+      } catch (error) {
+        console.error("Unable to parse Civil Works ITB payload", error, text);
+        throw new Error("Invalid JSON response from Civil Works ITB endpoint.");
+      }
+      const normalized = normalizeItbRecords(payload);
+      setSourceRecordCount(normalized.length);
+      setRawItbRecords(normalized);
+      setLastFetchedAt(new Date());
+    } catch (error: any) {
+      setItbError(error?.message || "Unable to fetch Civil Works Invitations to Bid.");
+      setRawItbRecords([]);
+      setSourceRecordCount(null);
+    } finally {
+      setItbLoading(false);
+    }
+  }, [itbApiUrl]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      fetchCivilWorksRecords().catch(() => undefined);
+    }
+  }, [fetchCivilWorksRecords]);
+
+  const addKnownProjectId = useCallback((id: string) => {
+    if (!id) return;
+    const normalized = id.trim().toUpperCase();
+    if (!normalized) return;
+    setKnownIdsInput((prev) => {
+      const existing = prev
+        .split(/[\n\r,;\t]+/)
+        .map((token) => token.trim().toUpperCase())
+        .filter(Boolean);
+      if (existing.includes(normalized)) return prev;
+      const prefix = prev.trim().length > 0 ? `${prev.trim()}\n` : "";
+      return `${prefix}${normalized}`;
+    });
+  }, []);
 
   const roles = useMemo(() => {
     if (!query) return ROLE_CATALOG;
@@ -354,6 +786,168 @@ export default function App() {
               <CardContent className="py-10 text-center text-muted-foreground">No matches. Try another keyword.</CardContent>
             </Card>
           )}
+        </div>
+
+        <div className="mt-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Construction className="h-5 w-5" />
+                Civil Works ITB Watcher
+              </CardTitle>
+              <CardDescription>
+                Monitor DPWH Civil Works invitations to bid, filter by district office, and surface only the notices you have
+                not logged yet.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="md:col-span-2 space-y-2">
+                  <Label htmlFor="civil-works-api">Civil Works ITB API endpoint</Label>
+                  <Input
+                    id="civil-works-api"
+                    value={itbApiUrl}
+                    onChange={(event) => setItbApiUrl(event.target.value)}
+                    placeholder={CIVIL_WORKS_API_URL}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Requests automatically append <code>advertisementType=Civil Works</code>. Adjust only if DPWH publishes a
+                    new endpoint.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="civil-works-office">Target district office</Label>
+                  <Input
+                    id="civil-works-office"
+                    value={officeFilter}
+                    onChange={(event) => setOfficeFilter(event.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Only records containing this office name (case-insensitive) remain in the list.
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="civil-works-known">Tracked / logged project IDs</Label>
+                <Textarea
+                  id="civil-works-known"
+                  value={knownIdsInput}
+                  onChange={(event) => setKnownIdsInput(event.target.value)}
+                  rows={4}
+                  placeholder={`25JD0026\n25JD0027\n25JD0028`}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Separate IDs with commas or line breaks. Invitations whose project IDs appear here will be hidden from the
+                  "new" list.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button onClick={fetchCivilWorksRecords} disabled={itbLoading}>
+                  {itbLoading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="mr-2 h-4 w-4" />
+                  )}
+                  Fetch Civil Works ITB
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  The fetch runs on page load; use the button to refresh manually when DPWH posts new notices.
+                </span>
+              </div>
+              {itbError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Unable to fetch invitations</AlertTitle>
+                  <AlertDescription>{itbError}</AlertDescription>
+                </Alert>
+              )}
+              <div className="space-y-4">
+                {itbLoading && (
+                  <div className="flex items-center gap-2 rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading Civil Works invitations...
+                  </div>
+                )}
+                {!itbLoading && filteredItbRecords.length === 0 && (
+                  <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                    No new Civil Works invitations matched the office and closing-date filters.
+                  </div>
+                )}
+                {filteredItbRecords.map((record) => {
+                  const closingDate = record.closingDateObj ?? parseFlexibleDate(record.closingDate);
+                  const postedDate = parseFlexibleDate(record.postedDate);
+                  const mapUrl = computeMapUrl(record);
+                  const key = record.projectId || record.title;
+                  return (
+                    <div key={key} className="space-y-3 rounded-lg border bg-white p-4 shadow-sm">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <h3 className="text-sm font-semibold sm:text-base">{record.title}</h3>
+                          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                            <span>
+                              <strong>ID:</strong> {record.projectId}
+                            </span>
+                            {record.office && <span className="hidden sm:inline">•</span>}
+                            {record.office && <span>{record.office}</span>}
+                          </div>
+                        </div>
+                        <Badge variant="secondary">Civil Works</Badge>
+                      </div>
+                      <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                        <div>
+                          <span className="font-medium text-foreground">Closing:</span> {formatDateDisplay(closingDate, record.closingDate)}
+                        </div>
+                        {record.location && (
+                          <div>
+                            <span className="font-medium text-foreground">Location:</span> {record.location}
+                          </div>
+                        )}
+                        {postedDate && (
+                          <div>
+                            <span className="font-medium text-foreground">Posted:</span> {formatDateDisplay(postedDate, record.postedDate)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {record.fileUrl ? (
+                          <Button asChild size="sm">
+                            <a href={record.fileUrl} target="_blank" rel="noopener noreferrer">
+                              <Download className="mr-2 h-4 w-4" />
+                              ITB File
+                            </a>
+                          </Button>
+                        ) : (
+                          <Badge variant="outline">No file link provided</Badge>
+                        )}
+                        {mapUrl && (
+                          <Button asChild size="sm" variant="outline">
+                            <a href={mapUrl} target="_blank" rel="noopener noreferrer">
+                              <MapPin className="mr-2 h-4 w-4" />
+                              Map location
+                            </a>
+                          </Button>
+                        )}
+                        {record.projectId && (
+                          <Button size="sm" variant="ghost" onClick={() => addKnownProjectId(record.projectId)}>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Mark as tracked
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+            <CardFooter className="flex flex-col gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">Known IDs {knownProjectIds.length}</Badge>
+                <Badge variant="outline">New {filteredItbRecords.length}</Badge>
+                {typeof sourceRecordCount === "number" && <Badge variant="outline">Fetched {sourceRecordCount}</Badge>}
+              </div>
+              <div>Last fetch: {lastFetchedAt ? formatDateDisplay(lastFetchedAt) : "Not yet fetched"}</div>
+            </CardFooter>
+          </Card>
         </div>
 
         {/* Quick Launch */}
