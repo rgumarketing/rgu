@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -7,41 +7,119 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronRight, Building2, ClipboardList, Users, FileText, Search, Plus, Download, CheckCircle2, Workflow, ClipboardCheck, Wrench, Settings2, Fuel, HardHat, Construction, Truck, Shield, Warehouse, ClipboardSignature, PenSquare } from "lucide-react";
+import { ChevronRight, Building2, ClipboardList, Users, FileText, Search, CheckCircle2, Workflow, ClipboardCheck, Settings2, HardHat, Truck, Shield, Warehouse, ClipboardSignature, PenSquare, Printer } from "lucide-react";
 
 // ---------------------------------------------
 // RGU MARKETING — ORGANIZATIONAL CHART (Interactive)
 // Single-file React component. Tailwind + shadcn/ui.
-// Click any role card to view: Obligations, Tasks/Functions, and Clickable Forms/Templates.
-// All templates open as plain-text (Notepad-friendly) for easy copy-paste.
+// NEW: Print button per form — prints two copies (ORIGINAL & DUPLICATE) on 80mm thermal paper.
 // ---------------------------------------------
 
-// Utility: Simple, copyable plain-text modal for forms/templates
+// Utility: Print helper for 80mm thermal with duplicate copy
+function openPrintWindow80mm(title: string, raw: string) {
+  // Escape HTML and keep text formatting
+  const esc = (s: string) => s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  const now = new Date();
+  const stamp = now.toLocaleString();
+
+  const block = (label: string) => `
+    <section class="copy">
+      <header>
+        <h1>RGU MARKETING</h1>
+        <h2>${esc(title)}</h2>
+        <div class="meta">
+          <span>${label}</span>
+          <span>Printed: ${esc(stamp)}</span>
+        </div>
+      </header>
+      <pre>${esc(raw)}</pre>
+      <footer>
+        <div class="cut">—  —  —  —  —  —  —  —  —  —  —</div>
+      </footer>
+    </section>
+  `;
+
+  const html = `
+  <html>
+    <head>
+      <meta charset="utf-8" />
+      <title>${esc(title)}</title>
+      <style>
+        @page { size: 80mm auto; margin: 5mm; }
+        html, body { padding: 0; margin: 0; }
+        body { width: 80mm; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 10.5pt; }
+        h1 { margin: 0 0 2px 0; font-size: 12pt; text-align: center; }
+        h2 { margin: 0 0 6px 0; font-size: 11pt; text-align: center; }
+        .meta { display: flex; justify-content: space-between; font-size: 9pt; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 4px 0; margin-bottom: 6px; }
+        pre { white-space: pre-wrap; word-wrap: break-word; margin: 0; line-height: 1.25; }
+        .copy { padding: 2mm 2mm 4mm; }
+        .copy + .copy { page-break-before: always; }
+        .cut { margin-top: 6px; text-align: center; font-size: 9pt; }
+        @media print { .no-print { display: none !important; } }
+      </style>
+    </head>
+    <body>
+      ${block("ORIGINAL")}
+      ${block("DUPLICATE")}
+      <div class="no-print" style="padding:8px;text-align:center;">
+        <button onclick="window.print()">Print</button>
+      </div>
+    </body>
+  </html>`;
+
+  const w = window.open("", "_blank", "noopener,noreferrer");
+  if (!w) return;
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  // Give rendering a moment before auto-print
+  setTimeout(() => {
+    try { w.print(); } catch {}
+  }, 300);
+}
+
+// Utility: Simple, copyable plain-text modal for forms/templates with Print
 const TemplateModal = ({ open, onOpenChange, title, body }: { open: boolean; onOpenChange: (v: boolean) => void; title: string; body: string; }) => {
   const [copied, setCopied] = useState(false);
+  const taRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const handleCopy = () => {
+    const text = taRef.current?.value ?? body;
+    navigator.clipboard.writeText(text || "");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handlePrint = () => {
+    const text = taRef.current?.value ?? body;
+    openPrintWindow80mm(title || "Template", text || "");
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold">{title}</DialogTitle>
-          <DialogDescription className="text-muted-foreground">Copy, edit, or save. Format kept simple for Notepad.</DialogDescription>
+          <DialogDescription className="text-muted-foreground">Copy, edit, or print. Printing is set for 80mm thermal with duplicate copy.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <Textarea
+            ref={taRef}
             className="min-h-[360px] font-mono text-sm"
             defaultValue={body}
           />
           <div className="flex items-center gap-2 justify-end">
-            <Button
-              variant="secondary"
-              onClick={() => {
-                navigator.clipboard.writeText(body);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-              }}
-            >
+            <Button variant="secondary" onClick={handleCopy}>
               {copied ? <CheckCircle2 className="mr-2 h-4 w-4"/> : <ClipboardCheck className="mr-2 h-4 w-4"/>}
-              {copied ? "Copied" : "Copy to clipboard"}
+              {copied ? "Copied" : "Copy"}
+            </Button>
+            <Button onClick={handlePrint}>
+              <Printer className="mr-2 h-4 w-4"/>
+              Print 80mm × 2 copies
             </Button>
           </div>
         </div>
@@ -332,7 +410,7 @@ export default function App() {
         <header className="flex items-start sm:items-center justify-between gap-4 flex-col sm:flex-row">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">RGU Organizational Chart</h1>
-            <p className="text-sm text-muted-foreground mt-1">Click a role to view obligations, functions, and launch job-related templates.</p>
+          <p className="text-sm text-muted-foreground mt-1">Click a role to view obligations, functions, and launch job-related templates. Each form can print 80mm ORIGINAL & DUPLICATE.</p>
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <Input
