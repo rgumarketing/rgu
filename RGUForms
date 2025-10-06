@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronRight, Building2, ClipboardList, Users, FileText, Search, CheckCircle2, Workflow, ClipboardCheck, Settings2, HardHat, Truck, Shield, Warehouse, ClipboardSignature, PenSquare, Printer } from "lucide-react";
+import { ChevronRight, Building2, ClipboardList, Users, FileText, Search, CheckCircle2, Workflow, ClipboardCheck, Settings2, HardHat, Truck, Shield, Warehouse, ClipboardSignature, PenSquare, Printer, Globe, Clock, FileSpreadsheet, FolderOpen } from "lucide-react";
 
 // ---------------------------------------------
 // RGU MARKETING — ORGANIZATIONAL CHART (Interactive)
@@ -143,6 +143,7 @@ const templates = {
   pettyCash: () => `RGU MARKETING — PETTY CASH VOUCHER (PCV)\nDate: __________  PCV No.: __________\nPayee: __________  Purpose: __________\nAmount: PHP __________ (₱______)\nCharged To: Project __________ / Dept __________\nRequested By: __________  Approved By: __________  Liquidation Due: __________\n` ,
   gatePass: () => `RGU MARKETING — GATE PASS (IN/OUT)\nDate: __________  Type: [ ] IN [ ] OUT\nItem/Equipment: __________  Qty: ___  Serial/Plate: __________\nFrom: __________  To: __________\nReason: __________  Approved By: __________  Checker: __________\n` ,
   deliveryReceipt: () => `RGU MARKETING — DELIVERY RECEIPT (DR)\nDate: __________  DR No.: __________\nDelivered To: __________ (Project/Warehouse)\nSupplier/From: __________  Vehicle/Plate: __________\n\nITEM | QTY | UNIT | REMARKS\n---- | --- | ---- | -------\n\nReceived By: __________  Time: __________  Condition: __________\n` ,
+  dpwhTracker: () => `DPWH PROCUREMENT TRACKER — DAILY LOG\nDate Checked: __________   Checked By: __________\nVisit: https://www.dpwh.gov.ph/dpwh/business/procurement/cw/advertisement?data_1=All&data_2=All&data=Jd&data_3=\nFilters Applied:\n- Office: Zamboanga del Nort 3rd District Engineering Office\n- Description: JD\n\nScreening Reminders:\n- Project ID must contain \"JD\"\n- Closing Date must not be today\n\nLOG ENTRIES\nProject ID | Closing Date | File Name | Civil Works | Status (Open/Closed) | Dropbox Link\n--------- | ------------ | --------- | ----------- | -------------------- | ------------\n\nNotes:\n- Download only files that are not already in the Dropbox tracker.\n- After downloading, update DPWH Contracts.xlsx with the details above.\n- If the Closing Date is on or before today, mark the Status as Closed.\n- Dropbox folder: https://www.dropbox.com/scl/fo/4jr366gn3cjkibzhihowi/AIGhY2nULXKM5Jov2r0txvA?rlkey=t5i369kvuyw6o0h0191ld3myo&st=zou93m0r&dl=0\n` ,
 };
 
 // Organization roles and mapping to frequently used templates
@@ -290,7 +291,7 @@ const ROLE_CATALOG = [
       "Maintain supplier master and price book",
       "Ensure documents for DPWH auditing"
     ],
-    forms: ["purchaseOrder", "deliveryReceipt", "materialRequest"],
+    forms: ["purchaseOrder", "deliveryReceipt", "materialRequest", "dpwhTracker"],
   },
   {
     id: "hr",
@@ -344,7 +345,7 @@ const ROLE_CATALOG = [
       "Distribute latest revisions to site",
       "Weekly document health check"
     ],
-    forms: ["siteInstruction", "ncr", "dar", "deliveryReceipt"],
+    forms: ["siteInstruction", "ncr", "dar", "deliveryReceipt", "dpwhTracker"],
   },
 ];
 
@@ -363,6 +364,7 @@ const TEMPLATE_META: Record<string, { label: string; }> = {
   pettyCash: { label: "Petty Cash Voucher" },
   gatePass: { label: "Gate Pass" },
   deliveryReceipt: { label: "Delivery Receipt" },
+  dpwhTracker: { label: "DPWH Procurement Tracker" },
 };
 
 const RoleCard = ({ role, onOpen }: any) => {
@@ -447,6 +449,81 @@ export default function App() {
             </CardContent>
           </Card>
         </div>
+
+        {/* DPWH Procurement Tracker helper */}
+        <div className="mt-8">
+          <Card className="border-primary/40 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5" />
+                DPWH Procurement Tracker Helper
+              </CardTitle>
+              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Perform at <span className="font-semibold text-foreground">8:00 AM</span> daily.
+              </p>
+              <div className="flex flex-wrap gap-2 pt-2">
+                <Badge variant="outline" className="text-xs sm:text-sm">Office: Zamboanga del Nort 3rd District Engineering Office</Badge>
+                <Badge variant="outline" className="text-xs sm:text-sm">Description: JD</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <div>
+                <p className="font-semibold flex items-center gap-2">
+                  <Globe className="h-4 w-4" />
+                  Daily checklist
+                </p>
+                <ol className="mt-2 list-decimal pl-5 space-y-2">
+                  <li>Open the <a className="text-primary underline" href="https://www.dpwh.gov.ph/dpwh/business/procurement/cw/advertisement?data_1=All&data_2=All&data=Jd&data_3=" target="_blank" rel="noreferrer">DPWH Civil Works advertisement page</a>.</li>
+                  <li>In <strong>Office</strong>, type <em>Zamboanga del Nort 3rd District Engineering Office</em>.</li>
+                  <li>In <strong>Description</strong>, enter <code>JD</code>.</li>
+                  <li>Click <strong>Search</strong> to load the listings.</li>
+                  <li>Review every result against the checks below.</li>
+                  <li>Download project files that are missing from the Dropbox tracker.</li>
+                  <li>Log the project in <strong>DPWH Contracts.xlsx</strong> immediately after download.</li>
+                </ol>
+              </div>
+              <div>
+                <p className="font-semibold flex items-center gap-2">
+                  <ClipboardCheck className="h-4 w-4" />
+                  Result checks
+                </p>
+                <ul className="mt-2 list-disc pl-5 space-y-1">
+                  <li>Project ID contains <code>JD</code>.</li>
+                  <li>Closing Date is not today's date.</li>
+                </ul>
+              </div>
+              <div>
+                <p className="font-semibold flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  After-download actions
+                </p>
+                <ul className="mt-2 list-disc pl-5 space-y-1">
+                  <li>Save files only when they are new to the Dropbox folder.</li>
+                  <li>Record Project ID, Closing Date, File Name, Civil Works, Status, and Dropbox Link in <strong>DPWH Contracts.xlsx</strong>.</li>
+                  <li>Set Status to <strong>Closed</strong> once the closing date reaches or passes today.</li>
+                </ul>
+              </div>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Button variant="outline" onClick={() => openTemplate("dpwhTracker")}>
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  Log template
+                </Button>
+                <Button variant="outline" asChild>
+                  <a href="https://www.dpwh.gov.ph/dpwh/business/procurement/cw/advertisement?data_1=All&data_2=All&data=Jd&data_3=" target="_blank" rel="noreferrer" className="flex items-center">
+                    <Globe className="mr-2 h-4 w-4" /> Open advertisement
+                  </a>
+                </Button>
+                <Button variant="outline" asChild>
+                  <a href="https://www.dropbox.com/scl/fo/4jr366gn3cjkibzhihowi/AIGhY2nULXKM5Jov2r0txvA?rlkey=t5i369kvuyw6o0h0191ld3myo&st=zou93m0r&dl=0" target="_blank" rel="noreferrer" className="flex items-center">
+                    <FolderOpen className="mr-2 h-4 w-4" /> Dropbox folder
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
 
         {/* Active Role Drawer/Modal */}
         <Dialog open={!!activeRole} onOpenChange={(o) => !o && setActiveRole(null)}>
