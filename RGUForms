@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronRight, Building2, ClipboardList, Users, FileText, Search, Plus, Download, CheckCircle2, Workflow, ClipboardCheck, Wrench, Settings2, Fuel, HardHat, Construction, Truck, Shield, Warehouse, ClipboardSignature, PenSquare } from "lucide-react";
+import { ChevronRight, Building2, ClipboardList, Users, FileText, Search, CheckCircle2, Workflow, ClipboardCheck, Settings2, HardHat, Truck, Shield, Warehouse, ClipboardSignature, PenSquare, Folder, FolderPlus, ExternalLink } from "lucide-react";
 
 // ---------------------------------------------
 // RGU MARKETING — ORGANIZATIONAL CHART (Interactive)
@@ -287,6 +287,41 @@ const TEMPLATE_META: Record<string, { label: string; }> = {
   deliveryReceipt: { label: "Delivery Receipt" },
 };
 
+type DataEntryStatus = "success" | "error" | "info";
+
+type DataEntry = {
+  id: string;
+  name: string;
+  description?: string;
+  slug: string;
+  folderPath: string;
+  folderUrl: string;
+  createdAt: string;
+};
+
+const statusStyles: Record<DataEntryStatus, string> = {
+  success: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  error: "border-red-200 bg-red-50 text-red-600",
+  info: "border-slate-200 bg-slate-50 text-slate-600",
+};
+
+const sanitizeFolderName = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\-\s]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+const composeFolderPath = (slug: string) => `RGU/Dropbox/${slug}`;
+
+const composeDropboxUrl = (path: string) =>
+  `https://www.dropbox.com/home/${path
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/")}`;
+
 const RoleCard = ({ role, onOpen }: any) => {
   const Icon = role.icon || Users;
   return (
@@ -315,6 +350,10 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [activeRole, setActiveRole] = useState<any | null>(null);
   const [tmplOpen, setTmplOpen] = useState<{ key: string | null; open: boolean }>({ key: null, open: false });
+  const [dataEntries, setDataEntries] = useState<DataEntry[]>([]);
+  const [dataForm, setDataForm] = useState<{ name: string; description: string }>({ name: "", description: "" });
+  const [dataSearch, setDataSearch] = useState("");
+  const [formStatus, setFormStatus] = useState<{ type: DataEntryStatus; message: string } | null>(null);
 
   const roles = useMemo(() => {
     if (!query) return ROLE_CATALOG;
@@ -325,6 +364,60 @@ export default function App() {
   }, [query]);
 
   const openTemplate = (key: string) => setTmplOpen({ key, open: true });
+
+  const filteredEntries = useMemo(() => {
+    if (!dataSearch.trim()) return dataEntries;
+    const q = dataSearch.toLowerCase();
+    return dataEntries.filter((entry) =>
+      [entry.name, entry.description || "", entry.folderPath].some((field) =>
+        field.toLowerCase().includes(q)
+      )
+    );
+  }, [dataEntries, dataSearch]);
+
+  const handleAddData = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmedName = dataForm.name.trim();
+    const trimmedDescription = dataForm.description.trim();
+
+    if (!trimmedName) {
+      setFormStatus({ type: "error", message: "Provide a data name to create a Dropbox folder." });
+      return;
+    }
+
+    const slug = sanitizeFolderName(trimmedName);
+    if (!slug) {
+      setFormStatus({ type: "error", message: "Folder names must contain alphanumeric characters." });
+      return;
+    }
+
+    const existing = dataEntries.find((entry) => entry.slug === slug);
+    if (existing) {
+      setFormStatus({ type: "info", message: `A Dropbox folder already exists for "${trimmedName}".` });
+      return;
+    }
+
+    const folderPath = composeFolderPath(slug);
+    const newEntry: DataEntry = {
+      id: `${Date.now()}`,
+      name: trimmedName,
+      description: trimmedDescription,
+      slug,
+      folderPath,
+      folderUrl: composeDropboxUrl(folderPath),
+      createdAt: new Date().toISOString(),
+    };
+
+    setDataEntries((prev) => [newEntry, ...prev]);
+    setDataForm({ name: "", description: "" });
+    setFormStatus({ type: "success", message: `Dropbox folder prepared for "${trimmedName}".` });
+  };
+
+  const openDropboxFolder = (entry: DataEntry) => {
+    if (typeof window !== "undefined") {
+      window.open(entry.folderUrl, "_blank", "noopener,noreferrer");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-slate-50">
@@ -354,6 +447,120 @@ export default function App() {
               <CardContent className="py-10 text-center text-muted-foreground">No matches. Try another keyword.</CardContent>
             </Card>
           )}
+        </div>
+
+        {/* Dropbox data capture */}
+        <div className="mt-8">
+          <Card>
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-base flex items-center gap-2">
+                <FolderPlus className="h-5 w-5" /> Dropbox Data Capture
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Add a new data record to automatically prepare its first Dropbox folder. Duplicate names simply reopen the
+                existing folder path.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <form
+                onSubmit={handleAddData}
+                className="grid gap-4 md:grid-cols-[minmax(0,220px)_minmax(0,1fr)_auto]"
+              >
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Data name</label>
+                  <Input
+                    value={dataForm.name}
+                    onChange={(event) => setDataForm((prev) => ({ ...prev, name: event.target.value }))}
+                    placeholder="e.g., Access Road Package A"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Notes / description</label>
+                  <Input
+                    value={dataForm.description}
+                    onChange={(event) => setDataForm((prev) => ({ ...prev, description: event.target.value }))}
+                    placeholder="Optional details for your team"
+                  />
+                </div>
+                <Button type="submit" className="self-end md:self-center">
+                  <FolderPlus className="mr-2 h-4 w-4" /> Create folder
+                </Button>
+              </form>
+
+              {formStatus && (
+                <div className={`rounded-md border px-3 py-2 text-sm ${statusStyles[formStatus.type]}`}>
+                  {formStatus.message}
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div className="flex-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Search folders</label>
+                  <Input
+                    value={dataSearch}
+                    onChange={(event) => setDataSearch(event.target.value)}
+                    placeholder="Search by name, notes, or folder path"
+                  />
+                </div>
+                {dataEntries.length > 0 && (
+                  <Badge variant="secondary" className="w-max mt-2 md:mt-6">
+                    {dataEntries.length} {dataEntries.length === 1 ? "folder" : "folders"}
+                  </Badge>
+                )}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {filteredEntries.length > 0 ? (
+                  filteredEntries.map((entry) => (
+                    <Card
+                      key={entry.id}
+                      className="group cursor-pointer transition hover:shadow-md"
+                      onClick={() => openDropboxFolder(entry)}
+                    >
+                      <CardHeader className="pb-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-1">
+                            <p className="flex items-center gap-2 text-sm font-semibold">
+                              <Folder className="h-4 w-4 text-muted-foreground" />
+                              {entry.name}
+                            </p>
+                            {entry.description && (
+                              <p className="text-xs text-muted-foreground break-words">{entry.description}</p>
+                            )}
+                          </div>
+                          <Badge variant="outline" className="whitespace-nowrap">
+                            {new Date(entry.createdAt).toLocaleDateString()}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-2 pt-0 text-xs text-muted-foreground">
+                        <div className="font-mono break-all rounded border border-dashed border-muted-foreground/30 bg-muted/40 px-2 py-1">
+                          {entry.folderPath}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="link"
+                          className="px-0 text-xs"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openDropboxFolder(entry);
+                          }}
+                        >
+                          <ExternalLink className="mr-2 h-3.5 w-3.5" /> Open in Dropbox
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))
+                ) : (
+                  <div className="col-span-full rounded-md border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+                    {dataEntries.length === 0
+                      ? "No data folders yet. Capture an item above to spin up the first Dropbox folder."
+                      : "No matches for your search. Try another keyword."}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Quick Launch */}
