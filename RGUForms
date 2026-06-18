@@ -130,6 +130,50 @@ const TemplateModal = ({ open, onOpenChange, title, body }: { open: boolean; onO
 
 // Plain-text templates (minimalistic, ISO/DPWH-friendly headings)
 const templates = {
+  dpwhNoaCivilWorks: () => `DPWH NOTICE OF AWARD (NOA) — CIVIL WORKS
+Date: __________   NOA No.: __________
+Project Title: __________________________________________
+Location: __________________________________________
+Contract ID/ABC: __________   Project ID: __________
+
+Procuring Entity: ______________________________________
+Winning Bidder: RGU MARKETING
+Bid Amount: PHP __________   Contract Amount: PHP __________
+Procurement Mode: __________
+
+Key Dates:
+- Notice of Award Issued: __________
+- Contract Signing Deadline: __________
+- NTP Target Date: __________
+
+Required Attachments:
+[ ] Bid Evaluation Report   [ ] BAC Resolution
+[ ] Post-Qualification Report   [ ] Performance Security
+
+Prepared By: __________   Verified By: __________   Approved By: __________
+` ,
+  dpwhNoaGoodsServices: () => `DPWH NOTICE OF AWARD (NOA) — GOODS & SERVICES
+Date: __________   NOA No.: __________
+Project Title: __________________________________________
+Delivery/Site Location: ________________________________
+Contract ID/ABC: __________   Project ID: __________
+
+Procuring Entity: ______________________________________
+Winning Bidder: RGU MARKETING
+Bid Amount: PHP __________   Contract Amount: PHP __________
+Procurement Mode: __________
+
+Key Dates:
+- Notice of Award Issued: __________
+- Contract Signing Deadline: __________
+- NTP/PO Target Date: __________
+
+Required Attachments:
+[ ] Bid Evaluation Report   [ ] BAC Resolution
+[ ] Post-Qualification Report   [ ] Performance Security
+
+Prepared By: __________   Verified By: __________   Approved By: __________
+` ,
   jobOrder: (data?: any) => `RGU MARKETING — JOB ORDER\nDate: __________\nProject: __________ (Contract ID if DPWH: __________)\nLocation: __________\nRequested By: __________\nApproved By: __________\n\nWORK DETAILS:\n- Task Title: __________\n- Scope/Instructions: __________________________________________\n- Start: __________  End: __________  Duration: __________\n- Crew/Personnel: __________________________________________\n\nRESOURCES:\n- Materials: __________________________________________\n- Equipment: __________________________________________\n- Fuel/Lubes: __________________________________________\n\nATTACHMENTS REQUIRED:\n[ ] Site Sketch   [ ] BOQ Ref   [ ] Safety JHA   [ ] Permits\n\nVERIFICATION & SIGN-OFF:\nPrepared: __________   Verified: __________   Approved: __________\n` ,
   materialRequest: () => `RGU MARKETING — MATERIAL REQUEST (MR)\nDate: __________\nProject: __________\nRequested By: __________ (Role: __________)\nNeeded On: __________ (ETA to Site: __________)\n\nITEMS:\n1) __________ | Qty: ___ | Unit: ___ | Specs/Brand: ___ | BOQ Ref: ___\n2) __________ | Qty: ___ | Unit: ___ | Specs/Brand: ___ | BOQ Ref: ___\n\nDELIVERY / PICKUP:\n- Supplier: __________  PR/PO No.: __________\n- Warehouse Check: [ ] Available [ ] Not Available\n\nApprovals: Requester → PE → PM/AMO\n` ,
   equipmentRequest: () => `RGU MARKETING — EQUIPMENT REQUEST (ER)\nDate: __________\nProject: __________\nRequested By: __________\n\nEQUIPMENT NEEDED:\n- Type: __________  Qty: ___  Operator: [ ] Yes [ ] No\n- Start: __________  End: __________  Shift Hours: __________\n- Hauling Required: [ ] Yes [ ] No  Location: __________\n\nFuel Plan: __________  Charge To: __________\nApprovals: Foreman → PE → Dispatcher/PM\n` ,
@@ -291,7 +335,7 @@ const ROLE_CATALOG = [
       "Maintain supplier master and price book",
       "Ensure documents for DPWH auditing"
     ],
-    forms: ["purchaseOrder", "deliveryReceipt", "materialRequest", "dpwhTracker"],
+    forms: ["purchaseOrder", "deliveryReceipt", "materialRequest", "dpwhTracker", "dpwhNoaCivilWorks", "dpwhNoaGoodsServices"],
   },
   {
     id: "hr",
@@ -345,7 +389,7 @@ const ROLE_CATALOG = [
       "Distribute latest revisions to site",
       "Weekly document health check"
     ],
-    forms: ["siteInstruction", "ncr", "dar", "deliveryReceipt", "dpwhTracker"],
+    forms: ["siteInstruction", "ncr", "dar", "deliveryReceipt", "dpwhTracker", "dpwhNoaCivilWorks", "dpwhNoaGoodsServices"],
   },
 ];
 
@@ -365,6 +409,8 @@ const TEMPLATE_META: Record<string, { label: string; }> = {
   gatePass: { label: "Gate Pass" },
   deliveryReceipt: { label: "Delivery Receipt" },
   dpwhTracker: { label: "DPWH Procurement Tracker" },
+  dpwhNoaCivilWorks: { label: "DPWH NOA — Civil Works" },
+  dpwhNoaGoodsServices: { label: "DPWH NOA — Goods & Services" },
 };
 
 const RoleCard = ({ role, onOpen }: any) => {
