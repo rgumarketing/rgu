@@ -143,7 +143,51 @@ const templates = {
   pettyCash: () => `RGU MARKETING — PETTY CASH VOUCHER (PCV)\nDate: __________  PCV No.: __________\nPayee: __________  Purpose: __________\nAmount: PHP __________ (₱______)\nCharged To: Project __________ / Dept __________\nRequested By: __________  Approved By: __________  Liquidation Due: __________\n` ,
   gatePass: () => `RGU MARKETING — GATE PASS (IN/OUT)\nDate: __________  Type: [ ] IN [ ] OUT\nItem/Equipment: __________  Qty: ___  Serial/Plate: __________\nFrom: __________  To: __________\nReason: __________  Approved By: __________  Checker: __________\n` ,
   deliveryReceipt: () => `RGU MARKETING — DELIVERY RECEIPT (DR)\nDate: __________  DR No.: __________\nDelivered To: __________ (Project/Warehouse)\nSupplier/From: __________  Vehicle/Plate: __________\n\nITEM | QTY | UNIT | REMARKS\n---- | --- | ---- | -------\n\nReceived By: __________  Time: __________  Condition: __________\n` ,
-  dpwhTracker: () => `DPWH PROCUREMENT TRACKER — DAILY LOG\nDate Checked: __________   Checked By: __________\nVisit: https://www.dpwh.gov.ph/dpwh/business/procurement/cw/advertisement?data_1=All&data_2=All&data=Jd&data_3=\nFilters Applied:\n- Office: Zamboanga del Nort 3rd District Engineering Office\n- Description: JD\n\nScreening Reminders:\n- Project ID must contain \"JD\"\n- Closing Date must not be today\n\nLOG ENTRIES\nProject ID | Closing Date | File Name | Civil Works | Status (Open/Closed) | Dropbox Link\n--------- | ------------ | --------- | ----------- | -------------------- | ------------\n\nNotes:\n- Download only files that are not already in the Dropbox tracker.\n- After downloading, update DPWH Contracts.xlsx with the details above.\n- If the Closing Date is on or before today, mark the Status as Closed.\n- Dropbox folder: https://www.dropbox.com/scl/fo/4jr366gn3cjkibzhihowi/AIGhY2nULXKM5Jov2r0txvA?rlkey=t5i369kvuyw6o0h0191ld3myo&st=zou93m0r&dl=0\n` ,
+  dpwhTracker: () => `DPWH CIVIL WORKS PROCUREMENT — DAILY LOG
+Date Checked: __________   Checked By: __________
+Visit: https://www.dpwh.gov.ph/dpwh/business/procurement/cw/advertisement?data_1=All&data_2=All&data=Jd&data_3=
+Filters Applied:
+- Office: Zamboanga del Nort 3rd District Engineering Office
+- Description: JD
+- Keyword Check: RGU Marketing / RGU
+
+Screening Reminders:
+- Project ID must contain "JD"
+- Closing Date must not be today
+
+LOG ENTRIES
+Project ID | Closing Date | File Name | Civil Works | Status (New/Open/Closed) | Dropbox Link
+--------- | ------------ | --------- | ----------- | -------------------- | ------------
+
+Notes:
+- Download only files that are not already in the Dropbox tracker.
+- After downloading, update DPWH Contracts.xlsx with the details above.
+- Mark as New if posted within the last 24 hours.
+- If the Closing Date is on or before today, mark the Status as Closed.
+- Dropbox folder: https://www.dropbox.com/scl/fo/4jr366gn3cjkibzhihowi/AIGhY2nULXKM5Jov2r0txvA?rlkey=t5i369kvuyw6o0h0191ld3myo&st=zou93m0r&dl=0
+` ,
+  dpwhGoodsServices: () => `DPWH GOODS & SERVICES PROCUREMENT — DAILY LOG
+Date Checked: __________   Checked By: __________
+Visit: https://www.dpwh.gov.ph/dpwh/business/procurement/goods/advertisement
+Filters Applied:
+- Office: Zamboanga del Nort 3rd District Engineering Office
+- Keyword Check: RGU Marketing / RGU
+
+Screening Reminders:
+- Confirm scope is relevant to RGU Marketing.
+- Tag entries that are newly posted (last 24 hours).
+
+LOG ENTRIES
+Reference No. | Closing Date | File Name | Goods/Services | Status (New/Open/Closed) | Dropbox Link
+------------ | ------------ | --------- | -------------- | ------------------------ | ------------
+
+Notes:
+- Download only files that are not already in the Dropbox tracker.
+- After downloading, update DPWH Contracts.xlsx with the details above.
+- Mark as New if posted within the last 24 hours.
+- If the Closing Date is on or before today, mark the Status as Closed.
+- Dropbox folder: https://www.dropbox.com/scl/fo/4jr366gn3cjkibzhihowi/AIGhY2nULXKM5Jov2r0txvA?rlkey=t5i369kvuyw6o0h0191ld3myo&st=zou93m0r&dl=0
+` ,
 };
 
 // Organization roles and mapping to frequently used templates
@@ -291,7 +335,7 @@ const ROLE_CATALOG = [
       "Maintain supplier master and price book",
       "Ensure documents for DPWH auditing"
     ],
-    forms: ["purchaseOrder", "deliveryReceipt", "materialRequest", "dpwhTracker"],
+    forms: ["purchaseOrder", "deliveryReceipt", "materialRequest", "dpwhTracker", "dpwhGoodsServices"],
   },
   {
     id: "hr",
@@ -345,7 +389,7 @@ const ROLE_CATALOG = [
       "Distribute latest revisions to site",
       "Weekly document health check"
     ],
-    forms: ["siteInstruction", "ncr", "dar", "deliveryReceipt", "dpwhTracker"],
+    forms: ["siteInstruction", "ncr", "dar", "deliveryReceipt", "dpwhTracker", "dpwhGoodsServices"],
   },
 ];
 
@@ -364,7 +408,8 @@ const TEMPLATE_META: Record<string, { label: string; }> = {
   pettyCash: { label: "Petty Cash Voucher" },
   gatePass: { label: "Gate Pass" },
   deliveryReceipt: { label: "Delivery Receipt" },
-  dpwhTracker: { label: "DPWH Procurement Tracker" },
+  dpwhTracker: { label: "DPWH Civil Works Tracker" },
+  dpwhGoodsServices: { label: "DPWH Goods & Services Tracker" },
 };
 
 const RoleCard = ({ role, onOpen }: any) => {
@@ -456,7 +501,7 @@ export default function App() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ClipboardList className="h-5 w-5" />
-                DPWH Procurement Tracker Helper
+                DPWH Procurement Monitoring Helper
               </CardTitle>
               <p className="text-sm text-muted-foreground flex items-center gap-2">
                 <Clock className="h-4 w-4" />
@@ -475,8 +520,10 @@ export default function App() {
                 </p>
                 <ol className="mt-2 list-decimal pl-5 space-y-2">
                   <li>Open the <a className="text-primary underline" href="https://www.dpwh.gov.ph/dpwh/business/procurement/cw/advertisement?data_1=All&data_2=All&data=Jd&data_3=" target="_blank" rel="noreferrer">DPWH Civil Works advertisement page</a>.</li>
+                  <li>Open the <a className="text-primary underline" href="https://www.dpwh.gov.ph/dpwh/business/procurement/goods/advertisement" target="_blank" rel="noreferrer">DPWH Goods &amp; Services advertisement page</a>.</li>
                   <li>In <strong>Office</strong>, type <em>Zamboanga del Nort 3rd District Engineering Office</em>.</li>
-                  <li>In <strong>Description</strong>, enter <code>JD</code>.</li>
+                  <li>In <strong>Description</strong> (Civil Works), enter <code>JD</code>.</li>
+                  <li>Search keywords: <strong>RGU</strong> or <strong>RGU Marketing</strong>.</li>
                   <li>Click <strong>Search</strong> to load the listings.</li>
                   <li>Review every result against the checks below.</li>
                   <li>Download project files that are missing from the Dropbox tracker.</li>
@@ -491,6 +538,7 @@ export default function App() {
                 <ul className="mt-2 list-disc pl-5 space-y-1">
                   <li>Project ID contains <code>JD</code>.</li>
                   <li>Closing Date is not today's date.</li>
+                  <li>Tag newly posted listings within the last 24 hours.</li>
                 </ul>
               </div>
               <div>
@@ -507,11 +555,20 @@ export default function App() {
               <div className="flex flex-wrap gap-2 pt-1">
                 <Button variant="outline" onClick={() => openTemplate("dpwhTracker")}>
                   <FileSpreadsheet className="mr-2 h-4 w-4" />
-                  Log template
+                  Civil Works log
+                </Button>
+                <Button variant="outline" onClick={() => openTemplate("dpwhGoodsServices")}>
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  Goods &amp; Services log
                 </Button>
                 <Button variant="outline" asChild>
                   <a href="https://www.dpwh.gov.ph/dpwh/business/procurement/cw/advertisement?data_1=All&data_2=All&data=Jd&data_3=" target="_blank" rel="noreferrer" className="flex items-center">
                     <Globe className="mr-2 h-4 w-4" /> Open advertisement
+                  </a>
+                </Button>
+                <Button variant="outline" asChild>
+                  <a href="https://www.dpwh.gov.ph/dpwh/business/procurement/goods/advertisement" target="_blank" rel="noreferrer" className="flex items-center">
+                    <Globe className="mr-2 h-4 w-4" /> Open goods &amp; services
                   </a>
                 </Button>
                 <Button variant="outline" asChild>
